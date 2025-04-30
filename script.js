@@ -2,7 +2,40 @@ const rows = 30;
 const cols = 50;
 let isRunning = false;
 let intervalId;
+let stepCount = 0;
+
 const gridElement = document.getElementById("grid");
+const synth = new Tone.PolySynth(Tone.Synth).toDestination();
+
+const chordSets = [
+  [
+    ["C4", "E4", "G4"],
+    ["G3", "B3", "D4"],
+    ["A3", "C4", "E4"],
+    ["F3", "A3", "C4"],
+  ],
+  [
+    ["Em3", "G3", "B3"],
+    ["C4", "E4", "G4"],
+    ["G3", "B3", "D4"],
+    ["D4", "F#4", "A4"],
+  ],
+  [
+    ["Dm3", "F3", "A3"],
+    ["Bb3", "D4", "F4"],
+    ["F3", "A3", "C4"],
+    ["C4", "E4", "G4"],
+  ],
+];
+
+function playChordLikeNotes(activeRows) {
+  const currentSet = chordSets[Math.floor(stepCount / 16) % chordSets.length];
+  const chord = currentSet[stepCount % currentSet.length];
+  const notes = activeRows
+    .map((r) => chord[r % chord.length])
+    .filter((v, i, a) => a.indexOf(v) === i);
+  synth.triggerAttackRelease(notes, "8n");
+}
 
 function createGrid() {
   gridElement.innerHTML = "";
@@ -11,7 +44,7 @@ function createGrid() {
     cell.classList.add("cell");
     cell.dataset.index = i;
 
-    // ランダムに初期化（30%の確率で alive）
+    // ランダム初期化（30%）
     if (Math.random() < 0.3) {
       cell.classList.add("alive");
     }
@@ -32,8 +65,8 @@ function getNextState(current) {
       for (let y = -1; y <= 1; y++) {
         for (let x = -1; x <= 1; x++) {
           if (y === 0 && x === 0) continue;
-          const ni = i + y,
-                nj = j + x;
+          const ni = i + y;
+          const nj = j + x;
           if (ni >= 0 && ni < rows && nj >= 0 && nj < cols) {
             const nIdx = ni * cols + nj;
             if (current[nIdx]) count++;
@@ -48,19 +81,37 @@ function getNextState(current) {
   return next;
 }
 
+
 function step() {
   const cells = Array.from(document.querySelectorAll(".cell"));
-  const current = cells.map(cell => cell.classList.contains("alive"));
+  const current = cells.map((cell) => cell.classList.contains("alive"));
   const next = getNextState(current);
 
+  const newAliveRows = [];
+
   next.forEach((alive, i) => {
-    cells[i].classList.toggle("alive", alive);
+    const cell = cells[i];
+    const wasAlive = cell.classList.contains("alive");
+    const becameAlive = !wasAlive && alive;
+
+    if (becameAlive) {
+      const row = Math.floor(i / cols);
+      newAliveRows.push(row);
+    }
+
+    cell.classList.toggle("alive", alive);
   });
+
+  if (newAliveRows.length > 0) {
+    playChordLikeNotes(newAliveRows);
+  }
+
+  stepCount++;
 }
 
 document.getElementById("startBtn").addEventListener("click", () => {
   if (!isRunning) {
-    intervalId = setInterval(step, 200);
+    intervalId = setInterval(step, 800); // ⏱ テンポ調整
     isRunning = true;
   }
 });
@@ -73,77 +124,13 @@ document.getElementById("stopBtn").addEventListener("click", () => {
 document.getElementById("resetBtn").addEventListener("click", () => {
   clearInterval(intervalId);
   isRunning = false;
+  stepCount = 0;
   createGrid();
 });
 
-createGrid();
-function playNote(row) {
-  const notes = [
-    "C4",
-    "D4",
-    "E4",
-    "F4",
-    "G4",
-    "A4",
-    "B4",
-    "C5",
-    "D5",
-    "E5",
-    "F5",
-    "G5",
-    "A5",
-    "B5",
-    "C6",
-  ];
-  const synth = new Tone.Synth().toDestination();
-  const note = notes[row % notes.length];
-  synth.triggerAttackRelease(note, "8n");
-}
-function step() {
-  const cells = Array.from(document.querySelectorAll(".cell"));
-  const current = cells.map((cell) => cell.classList.contains("alive"));
-  const next = getNextState(current);
-
-  next.forEach((alive, i) => {
-    const cell = cells[i];
-    const wasAlive = cell.classList.contains("alive");
-    const becameAlive = !wasAlive && alive;
-
-    // 行番号を計算
-    const row = Math.floor(i / cols);
-
-    // 新たに生きたセルが出たら音を鳴らす
-    if (becameAlive) {
-      playNote(row);
-    }
-
-    cell.classList.toggle("alive", alive);
-  });
-}
 document.getElementById("soundBtn").addEventListener("click", async () => {
   await Tone.start();
   alert("音が有効になりました！");
 });
-const synth = new Tone.Synth().toDestination();
 
-function playNote(row) {
-  const notes = [
-    "C4",
-    "D4",
-    "E4",
-    "F4",
-    "G4",
-    "A4",
-    "B4",
-    "C5",
-    "D5",
-    "E5",
-    "F5",
-    "G5",
-    "A5",
-    "B5",
-    "C6",
-  ];
-  const note = notes[row % notes.length];
-  synth.triggerAttackRelease(note, "8n");
-}
+createGrid();
